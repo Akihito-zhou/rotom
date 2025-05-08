@@ -97,52 +97,50 @@ class MainWindow(QWidget):
         self.input_box.returnPressed.connect(self.chat)
         self.upload_button.clicked.connect(self.upload_image)
 
+    def append_message(self, sender: str, text: str, side: str, color: str):
+        cursor = self.chat_display.textCursor()
+        cursor.movePosition(cursor.End)
+        html = (
+            f"<div align='{side}'>"
+            f"<span style='background-color: {color}; padding: 8px; border-radius: 10px;'>"
+            f"<b>{sender}：</b> {text}</span></div><br>"
+        )
+        cursor.insertHtml(html)
+        self.chat_display.setTextCursor(cursor)
+
     def chat(self):
         user_input = self.input_box.text().strip()
         if not user_input:
             return
         self.input_box.clear()
 
-        # === 用户消息 ===
-        cursor = self.chat_display.textCursor()
-        cursor.movePosition(cursor.End)
-        cursor.insertHtml(
-            f"<div align='right'><span style='background-color: #d0f0ff; padding: 8px; border-radius: 10px;'>"
-            f"<b>你：</b> {user_input}</span></div><br>"
-        )
+        # ✅ 先显示用户发言（右侧）
+        self.append_message("你", user_input, "right", "#d0f0ff")
 
-        # === 洛托姆回答 ===
+        # ✅ 获取模型回复
         response = ask_gpt(user_input)
-        cursor = self.chat_display.textCursor()
-        cursor.movePosition(cursor.End)
-        cursor.insertHtml(
-            f"<div align='left'><span style='background-color: #fff2cc; padding: 8px; border-radius: 10px;'>"
-            f"<b>ロトム：</b> {response}</span></div><br>"
-        )
-        self.chat_display.setTextCursor(cursor)
+
+        # ✅ 清洗多余内容（虽然 ask_gpt 已经处理，但保险再扫一遍）
+        for tag in ["ロトム：", "ユーザー：", "ポケモン："]:
+            if response.startswith(tag):
+                response = response[len(tag):].strip()
+        response = response.replace("\n", "<br>")
+
+        # ✅ 显示助手回复（左侧）
+        self.append_message("ロトム", response, "left", "#fff2cc")
 
     def upload_image(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "选择图片", "", "Images (*.png *.jpg *.jpeg)")
         if file_path:
-            # 显示你上传了图片
-            cursor = self.chat_display.textCursor()
-            cursor.movePosition(cursor.End)
-            cursor.insertHtml(
-                f"<div align='right'><span style='background-color: #e0f7fa; padding: 8px; border-radius: 10px;'>"
-                f"<b>你：</b> 上传了一张图片</span></div><br>"
-            )
+            # 显示上传提示
+            self.append_message("你", "上传了一张图片", "right", "#e0f7fa")
 
-            # 调用 vision 模块
+            # 获取图像描述
             description = describe_image(file_path)
+            description = description.replace("\n", "<br>")
 
-            # 洛托姆描述结果
-            cursor = self.chat_display.textCursor()
-            cursor.movePosition(cursor.End)
-            cursor.insertHtml(
-                f"<div align='left'><span style='background-color: #fff2cc; padding: 8px; border-radius: 10px;'>"
-                f"<b>ロトム：</b> {description}</span></div><br>"
-            )
-            self.chat_display.setTextCursor(cursor)
+            # 插入洛托姆视觉回应
+            self.append_message("ロトム", description, "left", "#fff2cc")
 
 
 if __name__ == "__main__":
