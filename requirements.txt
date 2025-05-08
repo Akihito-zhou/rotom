@@ -2,3 +2,4 @@ beautifulsoup4==4.13.4
 PyQt5==5.15.11
 PyQt5_sip==12.15.0
 Requests==2.32.3
+llama_cpp_python==0.3.8
