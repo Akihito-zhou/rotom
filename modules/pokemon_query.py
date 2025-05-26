@@ -10,33 +10,72 @@ POKEMON_DIR = os.path.join(BASE_DIR, "pokemon")
 MOVE_DIR = os.path.join(BASE_DIR, "move")
 ABILITY_DIR = os.path.join(BASE_DIR, "ability")
 
-
-def get_all_form_images(index: str, name: str) -> str:
+def get_all_form_images(index: str, name: str, extra_images: list = None) -> str:
     """返回所有形态图像的 HTML，包括普通和闪光版本"""
     img_html = ""
     index_fmt = f"{int(index):04}"
     prefix = f"{index_fmt}-{name}"
-    
-    if not os.path.isdir(IMAGE_DIR):
-        return ""
 
-    for file in sorted(os.listdir(IMAGE_DIR)):
-        if not file.startswith(prefix) or not file.endswith(".png"):
-            continue
+    # 从文件系统读取已有图片
+    if os.path.isdir(IMAGE_DIR):
+        for file in sorted(os.listdir(IMAGE_DIR)):
+            if not file.startswith(prefix) or not file.endswith(".png"):
+                continue
 
-        file_path = os.path.abspath(os.path.join(IMAGE_DIR, file))
-        file_url = f"file:///{quote(file_path.replace(os.sep, '/'))}"
+            file_path = os.path.abspath(os.path.join(IMAGE_DIR, file))
+            file_url = f"file:///{quote(file_path.replace(os.sep, '/'))}"
 
-        label = file[len(prefix):].replace(".png", "")
-        label = label.lstrip("-") or "默认形态"
-        label = label.replace("shiny", "✨ Shiny 版").replace("--", "-")
-        if "Shiny 版" not in label:
-            label = f"🎨 {label}"
+            label = file[len(prefix):].replace(".png", "")
+            label = label.lstrip("-") or "默认形态"
+            label = label.replace("shiny", "✨ Shiny 版").replace("--", "-")
+            if "Shiny 版" not in label:
+                label = f"🎨 {label}"
 
-        img_html += f"<div><b>{label}</b><br><img src='{file_url}' style='max-width:200px; border-radius:10px;'></div><br>"
+            img_html += f"<div><b>{label}</b><br><img src='{file_url}' style='max-width:200px; border-radius:10px;'></div><br>"
+
+    # 附加从 JSON 中指定的图像（如 home_images 字段）
+    if extra_images:
+        for form in extra_images:
+            for key, label in [("image", "🎨 默认形态"), ("shiny", "✨ Shiny 版")]:
+                file = form.get(key)
+                if not file:
+                    continue
+                file_path = os.path.abspath(os.path.join(IMAGE_DIR, file))
+                file_url = f"file:///{quote(file_path.replace(os.sep, '/'))}"
+                img_html += f"<div><b>{form['name']} - {label}</b><br><img src='{file_url}' style='max-width:200px; border-radius:10px;'></div><br>"
 
     return img_html
 
+def normalize(name: str) -> str:
+    """标准化名称：去空格、统一大小写、统一符号"""
+    return name.lower().replace(" ", "").replace("・", "").replace("－", "-").replace("—", "-")
+
+def match_name(input_name: str, data: dict) -> bool:
+    """判断输入名是否与当前数据中的任一候选名匹配"""
+    name_pool = set()
+
+    # 基本字段
+    name_pool.update([
+        data.get("name", ""),
+        data.get("name_jp", ""),
+        data.get("name_en", "")
+    ])
+
+    # 多语言字段
+    names_dict = data.get("names")
+    if isinstance(names_dict, dict):
+        name_pool.update(names_dict.values())
+
+    # 别名字段（如有）
+    aliases = data.get("aliases")
+    if isinstance(aliases, list):
+        name_pool.update(aliases)
+
+    input_normalized = normalize(input_name)
+    for candidate in name_pool:
+        if normalize(candidate) == input_normalized:
+            return True
+    return False
 
 def query_local(name: str, category: str) -> Tuple[bool, str]:
     dir_path = {
@@ -52,19 +91,23 @@ def query_local(name: str, category: str) -> Tuple[bool, str]:
         if not file.endswith(".json"):
             continue
 
+        #print(f"[DEBUG] 正在尝试读取文件: {file}")
+
         file_path = os.path.join(dir_path, file)
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                if name in (data.get("name"), data.get("name_jp"), data.get("name_en")):
+                #print(f"[DEBUG] 读取数据: {data.get('name')}")
+                if match_name(name, data):
                     if category == "pokemon":
                         return True, format_pokemon_html(data)
                     elif category == "move":
                         return True, format_move_html(data)
                     elif category == "ability":
                         return True, format_ability_html(data)
-        except Exception:
+        except Exception as e:
             continue
+        
 
     return False, f"「{name}」の情報は見つかりませんでした。"
 
@@ -91,8 +134,8 @@ def format_pokemon_html(data: dict) -> str:
         for a in ability_list
     )
 
-    img_html = get_all_form_images(index, name)
-    
+    img_html = get_all_form_images(index, name, data.get("home_images"))
+
     # 能力值展示
     stats = data.get("stats", [{}])[0].get("data", {})
     if stats:
@@ -239,11 +282,19 @@ def format_move_html(data: dict) -> str:
 def ask_gpt(prompt: str) -> str:
     keyword = prompt.strip()
 
-    # 遍历三类关键词类型进行匹配
-    for category in ["pokemon", "move", "ability"]:
-        result = query_local(keyword, category)
-        if "ロトム：" not in result or "找不到" not in result or "未登録" not in result:
-            return result
+    # 优先查宝可梦
+    success, content = query_local(keyword, "pokemon")
+    if success:
+        return content + f"<div style='color:gray;'>（来自宝可梦图鉴）</div>"
+
+    # 再查技能
+    success, content = query_local(keyword, "move")
+    if success:
+        return content + f"<div style='color:gray;'>（来自技能图鉴）</div>"
+
+    # 最后查特性
+    success, content = query_local(keyword, "ability")
+    if success:
+        return content + f"<div style='color:gray;'>（来自特性图鉴）</div>"
 
     return f"<div>すみません，「{keyword}」についてはまだ図鑑に登録されていません。</div>"
-
