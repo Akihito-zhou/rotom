@@ -1,33 +1,27 @@
-import os
 import sys
+import os
+import json
 
-# 加入项目根路径，确保可以 import modules 下的文件
+# 把 rotom 根目录添加到 sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from modules.pokemon_query import query_local
+# 然后使用无前缀导入
+from pokemon_query import format_pokemon_html
 
+# 设置宝可梦编号（例如 1 为妙蛙种子）
+POKEMON_INDEX = 1
+POKEMON_JSON_PATH = os.path.abspath(
+    os.path.join("pokemon-dataset-zh", "data", "pokemon", f"{POKEMON_INDEX:03}.json")
+)
 
-def test_query(keyword: str, category: str):
-    print(f"\n🧪 正在测试 query_local('{keyword}', '{category}')\n")
+if os.path.exists(POKEMON_JSON_PATH):
+    with open(POKEMON_JSON_PATH, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+        html = format_pokemon_html(data)
 
-    if category not in ["pokemon", "move", "ability"]:
-        print("❌ 无效的类别，只能是 'pokemon'、'move' 或 'ability'")
-        return
+        with open("test_output.html", "w", encoding="utf-8") as out:
+            out.write(f"<html><body>{html}</body></html>")
 
-    try:
-        result = query_local(keyword, category)
-        if "找不到" in result or "未登録" in result or "図鑑データのフォルダが見つかりません" in result:
-            print("❌ 查询失败")
-        else:
-            print("✅ 查询成功，结果片段如下：\n")
-            # 输出前300字符，避免刷屏
-            print(result[:300] + "...\n")
-    except Exception as e:
-        print(f"❌ 程序异常：{e}")
-
-
-if __name__ == "__main__":
-    # 可以自由修改下列测试内容
-    test_query("妙蛙种子", "pokemon")
-    test_query("恶臭", "ability")
-    test_query("超极巨百火焚野", "move")
+        print("✅ HTML 输出成功，打开 test_output.html 查看渲染效果。")
+else:
+    print(f"❌ 找不到 JSON 文件：{POKEMON_JSON_PATH}")
