@@ -7,8 +7,10 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt
 
-# 让你可以导入 modules 目录
+# 添加项目根目录到 sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+# 模块导入
 from modules.chat import ask_gpt
 from modules.vision import describe_image
 
@@ -19,14 +21,14 @@ class MainWindow(QWidget):
         self.setWindowTitle("洛托姆助手")
         self.setFixedSize(480, 720)
 
-        # === 背景图 ===
+        # 背景图
         self.bg_label = QLabel(self)
         self.bg_label.setPixmap(QPixmap("assets/rotom_bg (1).png").scaled(
             self.size(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation))
         self.bg_label.setGeometry(0, 0, self.width(), self.height())
         self.bg_label.lower()
 
-        # === 聊天框 ===
+        # 聊天框
         self.chat_display = QTextBrowser(self)
         self.chat_display.setStyleSheet("""
             QTextBrowser {
@@ -38,7 +40,7 @@ class MainWindow(QWidget):
             }
         """)
 
-        # === 输入框 ===
+        # 输入框
         self.input_box = QLineEdit()
         self.input_box.setPlaceholderText("ロトムに話しかけてみよう")
         self.input_box.setStyleSheet("""
@@ -49,7 +51,7 @@ class MainWindow(QWidget):
             }
         """)
 
-        # === 发送按钮 ===
+        # 发送按钮
         self.send_button = QPushButton("发送")
         self.send_button.setStyleSheet("""
             QPushButton {
@@ -64,7 +66,7 @@ class MainWindow(QWidget):
             }
         """)
 
-        # === 上传按钮 ===
+        # 上传按钮
         self.upload_button = QPushButton("📷 图片上传")
         self.upload_button.setStyleSheet("""
             QPushButton {
@@ -79,32 +81,41 @@ class MainWindow(QWidget):
             }
         """)
 
-        # === 输入区域布局 ===
+        # 输入区域布局
         input_layout = QHBoxLayout()
         input_layout.addWidget(self.input_box)
         input_layout.addWidget(self.send_button)
         input_layout.addWidget(self.upload_button)
 
-        # === 主布局 ===
+        # 主布局
         layout = QVBoxLayout()
         layout.addStretch(1)
         layout.addWidget(self.chat_display, 8)
         layout.addLayout(input_layout, 1)
         self.setLayout(layout)
 
-        # === 信号连接 ===
+        # 信号连接
         self.send_button.clicked.connect(self.chat)
         self.input_box.returnPressed.connect(self.chat)
         self.upload_button.clicked.connect(self.upload_image)
 
-    def append_message(self, sender: str, text: str, side: str, color: str):
+    def append_message(self, sender: str, text: str, side: str, is_html=False):
         cursor = self.chat_display.textCursor()
         cursor.movePosition(cursor.End)
+
+        align = "left" if side == "left" else "right"
+
         html = (
-            f"<div align='{side}'>"
-            f"<span style='background-color: {color}; padding: 8px; border-radius: 10px;'>"
-            f"<b>{sender}：</b> {text}</span></div><br>"
+            f"<table width='100%'><tr><td align='{align}'>"
+            f"<div style='padding: 10px; border-radius: 12px; "
+            f"max-width: 80%; font-size: 14px; font-family: Arial; display: inline-block;'>"
         )
+
+        if is_html:
+            html += f"<b style='color:gray'>{sender}：</b><br>{text}</div></td></tr></table><br>"
+        else:
+            html += f"<b style='color:gray'>{sender}：</b> {text}</div></td></tr></table><br>"
+
         cursor.insertHtml(html)
         self.chat_display.setTextCursor(cursor)
 
@@ -114,33 +125,24 @@ class MainWindow(QWidget):
             return
         self.input_box.clear()
 
-        # ✅ 先显示用户发言（右侧）
-        self.append_message("你", user_input, "right", "#d0f0ff")
+        # 用户提问（右侧）
+        self.append_message("你", user_input, "right")
 
-        # ✅ 获取模型回复
-        response = ask_gpt(user_input)
+        # 洛托姆回复（HTML）
+        response_html = ask_gpt(user_input)
+        self.append_message("ロトム", response_html, "left", is_html=True)
 
-        # ✅ 清洗多余内容（虽然 ask_gpt 已经处理，但保险再扫一遍）
-        for tag in ["ロトム：", "ユーザー：", "ポケモン："]:
-            if response.startswith(tag):
-                response = response[len(tag):].strip()
-        response = response.replace("\n", "<br>")
-
-        # ✅ 显示助手回复（左侧）
-        self.append_message("ロトム", response, "left", "#fff2cc")
+        # 自动滚动到底部
+        self.chat_display.verticalScrollBar().setValue(
+            self.chat_display.verticalScrollBar().maximum()
+        )
 
     def upload_image(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "选择图片", "", "Images (*.png *.jpg *.jpeg)")
         if file_path:
-            # 显示上传提示
-            self.append_message("你", "上传了一张图片", "right", "#e0f7fa")
-
-            # 获取图像描述
-            description = describe_image(file_path)
-            description = description.replace("\n", "<br>")
-
-            # 插入洛托姆视觉回应
-            self.append_message("ロトム", description, "left", "#fff2cc")
+            self.append_message("你", "上传了一张图片", "right")
+            description = describe_image(file_path).replace("\n", "<br>")
+            self.append_message("ロトム", description, "left", is_html=True)
 
 
 if __name__ == "__main__":
