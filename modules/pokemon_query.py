@@ -10,6 +10,34 @@ POKEMON_DIR = os.path.join(BASE_DIR, "pokemon")
 MOVE_DIR = os.path.join(BASE_DIR, "move")
 ABILITY_DIR = os.path.join(BASE_DIR, "ability")
 
+
+def get_all_form_images(index: str, name: str) -> str:
+    """返回所有形态图像的 HTML，包括普通和闪光版本"""
+    img_html = ""
+    index_fmt = f"{int(index):04}"
+    prefix = f"{index_fmt}-{name}"
+    
+    if not os.path.isdir(IMAGE_DIR):
+        return ""
+
+    for file in sorted(os.listdir(IMAGE_DIR)):
+        if not file.startswith(prefix) or not file.endswith(".png"):
+            continue
+
+        file_path = os.path.abspath(os.path.join(IMAGE_DIR, file))
+        file_url = f"file:///{quote(file_path.replace(os.sep, '/'))}"
+
+        label = file[len(prefix):].replace(".png", "")
+        label = label.lstrip("-") or "默认形态"
+        label = label.replace("shiny", "✨ Shiny 版").replace("--", "-")
+        if "Shiny 版" not in label:
+            label = f"🎨 {label}"
+
+        img_html += f"<div><b>{label}</b><br><img src='{file_url}' style='max-width:200px; border-radius:10px;'></div><br>"
+
+    return img_html
+
+
 def query_local(name: str, category: str) -> Tuple[bool, str]:
     dir_path = {
         "pokemon": POKEMON_DIR,
@@ -40,7 +68,6 @@ def query_local(name: str, category: str) -> Tuple[bool, str]:
 
     return False, f"「{name}」の情報は見つかりませんでした。"
 
-
 def format_pokemon_html(data: dict) -> str:
     name = data.get("name", "未知")
     name_jp = data.get("name_jp", "-")
@@ -64,22 +91,8 @@ def format_pokemon_html(data: dict) -> str:
         for a in ability_list
     )
 
-    # 🔁 新增：Shiny 图和普通图同时展示
-    index_fmt = f"{int(index):04}"  # 若你的图像是四位编号，如0001
-    filename_prefix = f"{index_fmt}-{name}"  # 使用中文名拼接图像文件名
-
-    shiny_path = os.path.abspath(os.path.join(IMAGE_DIR, f"{filename_prefix}-shiny.png"))
-    normal_path = os.path.abspath(os.path.join(IMAGE_DIR, f"{filename_prefix}.png"))
-
-    img_html = ""
-    if os.path.exists(shiny_path):
-        shiny_url = f"file:///{quote(shiny_path.replace(os.sep, '/'))}"
-        img_html += f"<div>✨ <b>闪光版本：</b><br><img src='{shiny_url}' style='max-width:200px; border-radius:10px;'><br></div>"
-
-    if os.path.exists(normal_path):
-        normal_url = f"file:///{quote(normal_path.replace(os.sep, '/'))}"
-        img_html += f"<div>🎨 <b>普通版本：</b><br><img src='{normal_url}' style='max-width:200px; border-radius:10px;'><br></div>"
-
+    img_html = get_all_form_images(index, name)
+    
     # 能力值展示
     stats = data.get("stats", [{}])[0].get("data", {})
     if stats:

@@ -1,27 +1,44 @@
-import sys
 import os
-import json
 
-# 把 rotom 根目录添加到 sys.path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+# 修改为你的项目图像路径
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "pokemon-dataset-zh", "data"))
+IMAGE_DIR = os.path.join(BASE_DIR, "images", "home")
 
-# 然后使用无前缀导入
-from pokemon_query import format_pokemon_html
 
-# 设置宝可梦编号（例如 1 为妙蛙种子）
-POKEMON_INDEX = 1
-POKEMON_JSON_PATH = os.path.abspath(
-    os.path.join("pokemon-dataset-zh", "data", "pokemon", f"{POKEMON_INDEX:03}.json")
-)
+def get_all_forms_images(index: str, name: str):
+    index_fmt = f"{int(index):04}"
+    prefix = f"{index_fmt}-{name}"
+    found_images = []
 
-if os.path.exists(POKEMON_JSON_PATH):
-    with open(POKEMON_JSON_PATH, 'r', encoding='utf-8') as f:
-        data = json.load(f)
-        html = format_pokemon_html(data)
+    for file in os.listdir(IMAGE_DIR):
+        if not file.endswith(".png") or not file.startswith(prefix):
+            continue
 
-        with open("test_output.html", "w", encoding="utf-8") as out:
-            out.write(f"<html><body>{html}</body></html>")
+        # 去掉.png后按-分隔
+        parts = file[:-4].split('-')
+        form_parts = parts[2:]  # 去掉编号和中文名
+        form_name = "-".join(form_parts).replace("-shiny", "")
+        is_shiny = "shiny" in file.lower()
 
-        print("✅ HTML 输出成功，打开 test_output.html 查看渲染效果。")
-else:
-    print(f"❌ 找不到 JSON 文件：{POKEMON_JSON_PATH}")
+        label = f"{form_name or '默认形态'} {'(Shiny)' if is_shiny else '(普通)'}"
+        image_path = os.path.abspath(os.path.join(IMAGE_DIR, file))
+        found_images.append((label, image_path))
+
+    return found_images
+
+
+if __name__ == "__main__":
+    # 👇 测试目标
+    test_cases = [
+        ("0003", "妙蛙花"),
+        ("0006", "喷火龙"),
+        ("0020", "拉达")
+    ]
+
+    for index, name in test_cases:
+        print(f"\n=== 📘 {name}（No.{index}）的所有图像形态 ===")
+        results = get_all_forms_images(index, name)
+        if not results:
+            print("⚠️ 未找到任何图像")
+        for label, path in results:
+            print(f"{label}：{path}")
