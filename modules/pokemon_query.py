@@ -1,6 +1,7 @@
 import os
 import json
 from typing import Tuple
+import unicodedata
 from urllib.parse import quote
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "pokemon-dataset-zh", "data"))
@@ -11,12 +12,10 @@ MOVE_DIR = os.path.join(BASE_DIR, "move")
 ABILITY_DIR = os.path.join(BASE_DIR, "ability")
 
 def get_all_form_images(index: str, name: str, extra_images: list = None) -> str:
-    """返回所有形态图像的 HTML，包括普通和闪光版本"""
     img_html = ""
     index_fmt = f"{int(index):04}"
     prefix = f"{index_fmt}-{name}"
 
-    # 从文件系统读取已有图片
     if os.path.isdir(IMAGE_DIR):
         for file in sorted(os.listdir(IMAGE_DIR)):
             if not file.startswith(prefix) or not file.endswith(".png"):
@@ -25,15 +24,13 @@ def get_all_form_images(index: str, name: str, extra_images: list = None) -> str
             file_path = os.path.abspath(os.path.join(IMAGE_DIR, file))
             file_url = f"file:///{quote(file_path.replace(os.sep, '/'))}"
 
-            label = file[len(prefix):].replace(".png", "")
-            label = label.lstrip("-") or "默认形态"
+            label = file[len(prefix):].replace(".png", "").lstrip("-") or "默认形态"
             label = label.replace("shiny", "✨ Shiny 版").replace("--", "-")
             if "Shiny 版" not in label:
                 label = f"🎨 {label}"
 
             img_html += f"<div><b>{label}</b><br><img src='{file_url}' style='max-width:200px; border-radius:10px;'></div><br>"
 
-    # 附加从 JSON 中指定的图像（如 home_images 字段）
     if extra_images:
         for form in extra_images:
             for key, label in [("image", "🎨 默认形态"), ("shiny", "✨ Shiny 版")]:
@@ -46,36 +43,34 @@ def get_all_form_images(index: str, name: str, extra_images: list = None) -> str
 
     return img_html
 
-def normalize(name: str) -> str:
-    """标准化名称：去空格、统一大小写、统一符号"""
-    return name.lower().replace(" ", "").replace("・", "").replace("－", "-").replace("—", "-")
+def normalize(text: str) -> str:
+    if not isinstance(text, str):
+        return ""
+    text = unicodedata.normalize("NFKC", text)
+    return text.strip().lower().replace("・", "").replace("－", "-").replace("—", "-").replace(" ", "")
 
 def match_name(input_name: str, data: dict) -> bool:
-    """判断输入名是否与当前数据中的任一候选名匹配"""
     name_pool = set()
 
-    # 基本字段
-    name_pool.update([
-        data.get("name", ""),
-        data.get("name_jp", ""),
-        data.get("name_en", "")
-    ])
+    for key in ["name", "name_jp", "name_en"]:
+        val = data.get(key)
+        if isinstance(val, str):
+            name_pool.add(val)
 
-    # 多语言字段
     names_dict = data.get("names")
     if isinstance(names_dict, dict):
-        name_pool.update(names_dict.values())
+        for val in names_dict.values():
+            if isinstance(val, str):
+                name_pool.add(val)
 
-    # 别名字段（如有）
     aliases = data.get("aliases")
     if isinstance(aliases, list):
-        name_pool.update(aliases)
+        for alias in aliases:
+            if isinstance(alias, str):
+                name_pool.add(alias)
 
-    input_normalized = normalize(input_name)
-    for candidate in name_pool:
-        if normalize(candidate) == input_normalized:
-            return True
-    return False
+    norm_input = normalize(input_name)
+    return any(normalize(candidate) == norm_input for candidate in name_pool)
 
 def query_local(name: str, category: str) -> Tuple[bool, str]:
     dir_path = {
@@ -91,13 +86,10 @@ def query_local(name: str, category: str) -> Tuple[bool, str]:
         if not file.endswith(".json"):
             continue
 
-        #print(f"[DEBUG] 正在尝试读取文件: {file}")
-
         file_path = os.path.join(dir_path, file)
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                #print(f"[DEBUG] 读取数据: {data.get('name')}")
                 if match_name(name, data):
                     if category == "pokemon":
                         return True, format_pokemon_html(data)
@@ -105,9 +97,8 @@ def query_local(name: str, category: str) -> Tuple[bool, str]:
                         return True, format_move_html(data)
                     elif category == "ability":
                         return True, format_ability_html(data)
-        except Exception as e:
+        except Exception:
             continue
-        
 
     return False, f"「{name}」の情報は見つかりませんでした。"
 
@@ -123,9 +114,12 @@ def format_pokemon_html(data: dict) -> str:
     genus = form.get("genus", "未知种类")
     shape = form.get("shape", "-")
     color = form.get("color", "-")
-    gender_rate = form.get("gender_rate", {})
-    male = gender_rate.get("male", "？")
-    female = gender_rate.get("female", "？")
+    gender_rate = form.get("gender_rate")
+    if isinstance(gender_rate, dict):
+        male = gender_rate.get("male", "？")
+        female = gender_rate.get("female", "？")
+    else:
+        male = female = "？"
     catch_rate = form.get("catch_rate", {}).get("rate", "？")
 
     ability_list = form.get("ability", [])
