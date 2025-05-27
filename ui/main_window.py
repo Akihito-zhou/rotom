@@ -13,7 +13,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 # 模块导入
 from modules.chat import ask_gpt
 from modules.vision import describe_image
-
+from urllib.parse import quote
 
 class MainWindow(QWidget):
     def __init__(self):
@@ -107,10 +107,10 @@ class MainWindow(QWidget):
 
         html = (
             f"<table width='100%'><tr><td align='{align}'>"
-            f"<div style='padding: 10px; border-radius: 12px; "
-            f"max-width: 80%; font-size: 14px; font-family: Arial; display: inline-block;'>"
+            f"<div style='padding:6px; border-radius:10px; font-size:14px; font-family:Arial; "
+            f"display:inline-block; max-width:80%; line-height:1.3; margin:0;'>"
         )
-
+        
         if is_html:
             html += f"<b style='color:gray'>{sender}：</b><br>{text}</div></td></tr></table><br>"
         else:
@@ -140,7 +140,20 @@ class MainWindow(QWidget):
     def upload_image(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "选择图片", "", "Images (*.png *.jpg *.jpeg)")
         if file_path:
-            self.append_message("你", "上传了一张图片", "right")
+            # 将本地路径转换为 file URL
+            file_url = f"file:///{quote(file_path.replace(os.sep, '/'))}"
+
+            # 限制图像显示大小，最大高度 300px，最大宽度不超过容器
+            img_html = (
+                f"<div style='max-width:320px;'>"
+                f"<img src='{file_url}' style='width:100%; height:auto; border-radius:10px;'>"
+                f"</div>"
+                )
+
+            # 用户上传信息和图片显示
+            self.append_message("你", f"上传了一张图片<br>{img_html}", "right", is_html=True)
+
+            # 图像识别描述
             description = describe_image(file_path).replace("\n", "<br>")
             self.append_message("ロトム", description, "left", is_html=True)
 

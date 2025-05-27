@@ -16,7 +16,7 @@ def describe_image(image_path: str) -> str:
         # 查图鉴
         found, html = query_local(matched_name, "pokemon")
         if found:
-            return f"✅ 与图像最相似的是：<b>{matched_name}</b>（相似度：{score:.2f}）<br><br>{html}"
+            return f"✅ 与图像最相似的是：<b>{matched_name}</b>（相似度：{score:.2f}）<br>{html}"
         else:
             return f"⚠️ 找到最相似的宝可梦：<b>{matched_name}</b>（相似度：{score:.2f}），但未能查询到其图鉴信息。"
     

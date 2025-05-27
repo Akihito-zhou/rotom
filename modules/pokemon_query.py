@@ -174,7 +174,7 @@ def format_pokemon_html(data: dict) -> str:
 
     return f'''
 <div align="left">
-<span style="padding: 10px; border-radius: 12px; display:block;">
+<span style="padding: 6px; border-radius: 12px; display:block; line-height: 1.2;">
 <br>
 📡 我来啦～这是 No.{index} <b>{name}</b>（{name_jp} / {name_en}）的图鉴信息～📘<br><br>
 {img_html}
