@@ -1,5 +1,15 @@
 beautifulsoup4==4.13.4
+clip==1.0
+deepl==1.22.0
+langdetect==1.0.9
+numpy==2.2.6
+openai==1.83.0
+Pillow==11.2.1
 PyQt5==5.15.11
-PyQt5_sip==12.15.0
+PyQt5_sip==12.17.0
+python-dotenv==1.1.0
 Requests==2.32.3
-llama_cpp_python==0.3.8
+scikit_learn==1.6.1
+selenium==4.33.0
+torch==2.6.0+cu126
+torchvision==0.21.0+cu126
