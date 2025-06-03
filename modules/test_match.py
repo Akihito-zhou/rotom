@@ -112,7 +112,7 @@
 
 import os
 import json
-from pokemon_query import query_local
+from modules.query.query_all import query_local
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "pokemon-dataset-zh", "data"))
 POKEMON_DIR = os.path.join(BASE_DIR, "pokemon")

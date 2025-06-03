@@ -1,4 +1,4 @@
-from pokemon_query import query_local  # 假设你的主函数在 main.py 中
+from modules.query.query_all import query_local  # 假设你的主函数在 main.py 中
 
 def run_tests():
     test_cases = [
