@@ -1,7 +1,9 @@
-from query_all import get_all_form_images
-from query_all import IMAGE_DIR
-from urllib.parse import quote
+# query_pokemon.py
 import os
+from modules.query.query_image import get_all_form_images
+from modules.query.config import IMAGE_DIR_EVOLUTION
+from urllib.parse import quote
+from typing import List, Tuple, Optional
 # def format_pokemon_html(data: dict) -> str:
 #     name = data.get("name", "未知")
 #     name_jp = data.get("name_jp", "-")
@@ -89,7 +91,6 @@ import os
 # 📊 <b>基础能力值：</b>{stat_html}
 # </span></div><br>
 # '''
-from typing import List, Tuple, Optional
 def format_pokemon_html(data: dict, fields: Optional[List[str]] = None) -> str:
     fields = set(fields or ["basic", "profile", "stats"])  # 默认展示基本信息、简介和能力值
     name = data.get("name", "未知")
@@ -174,6 +175,23 @@ def format_pokemon_html(data: dict, fields: Optional[List[str]] = None) -> str:
             stat_html = "暂无能力值数据"
         output.append(f"<br>📊 <b>基础能力值：</b>{stat_html}")
 
+    # 🧬 属性
+    if show_all or "types" in fields:
+        types = " / ".join(form.get("types", [])) or "不明"
+        output.append(f"<br>🧬 <b>属性：</b>{types}<br>")
+    
+    # 🧠 特性
+    if show_all or "ability" in fields:
+        abilities = form.get("ability", [])
+        if abilities:
+            ability_html = ", ".join(
+                f"{a['name']}<span style='color:gray;'>（隐藏）</span>" if a.get("is_hidden") else a["name"]
+                for a in abilities
+            )
+        else:
+            ability_html = "暂无特性数据"
+        output.append(f"<br>🧠 <b>特性：</b>{ability_html}<br>")
+        
     # 🧬 进化链
     if show_all or "evolution" in fields:
         chains = data.get("evolution_chains", [])
@@ -181,11 +199,17 @@ def format_pokemon_html(data: dict, fields: Optional[List[str]] = None) -> str:
         for chain in chains:
             evo_html += "<div style='margin: 0.5em 0;'>"
             for stage in chain:
-                img = stage.get("image", "")
-                img_path = os.path.abspath(os.path.join(IMAGE_DIR, img))
-                img_url = f"file:///{quote(img_path.replace(os.sep, '/'))}"
                 name = stage["name"]
-                evo_html += f"<img src='{img_url}' style='height:48px'> → <b>{name}</b> "
+                img_file = stage.get("image", "")
+                if img_file:
+                    evo_path = os.path.abspath(os.path.join(IMAGE_DIR_EVOLUTION, img_file))
+                    if os.path.exists(evo_path):
+                        evo_url = f"file:///{quote(evo_path.replace(os.sep, '/'))}"
+                        evo_html += f"<img src='{evo_url}' style='height:48px'> → <b>{name}</b> "
+                    else:
+                        evo_html += f"<b>{name}</b> → "
+                else:
+                    evo_html += f"<b>{name}</b> → "
             evo_html += "</div>"
         output.append(f"<br>🌱 <b>进化链：</b><br>{evo_html}")
 
@@ -220,5 +244,13 @@ def format_pokemon_html(data: dict, fields: Optional[List[str]] = None) -> str:
                 flavor_html += f"<li>{v['name']}：{v['text']}</li>"
             flavor_html += "</ul></details>"
         output.append(f"<br>📖 <b>图鉴描述：</b><br>{flavor_html}")
+
+    # 图片
+    if "images" in fields:
+        img_html = get_all_form_images(index, name, data.get("home_images"))
+        if img_html:
+            output.append(f"<br>🖼️ <b>形态图片：</b><br>{img_html}")
+        else:
+            output.append("<br>🖼️ <b>形态图片：</b>暂无图片数据")
 
     return "<div align='left'><span style='padding:6px; display:block; line-height: 1.6;'>" + "".join(output) + "</span></div>"

@@ -1,50 +1,13 @@
+# query_all.py
 import os
 import json
 from typing import List, Tuple, Optional
 import unicodedata
 from urllib.parse import quote
-from query_ability import format_ability_html
-from query_move import format_move_html
-from query_pokemon import format_pokemon_html
-
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "pokemon-dataset-zh", "data"))
-IMAGE_DIR = os.path.join(BASE_DIR, "images", "home")
-
-POKEMON_DIR = os.path.join(BASE_DIR, "pokemon")
-MOVE_DIR = os.path.join(BASE_DIR, "move")
-ABILITY_DIR = os.path.join(BASE_DIR, "ability")
-
-def get_all_form_images(index: str, name: str, extra_images: list = None) -> str:
-    img_html = ""
-    index_fmt = f"{int(index):04}"
-    prefix = f"{index_fmt}-{name}"
-
-    if os.path.isdir(IMAGE_DIR):
-        for file in sorted(os.listdir(IMAGE_DIR)):
-            if not file.startswith(prefix) or not file.endswith(".png"):
-                continue
-
-            file_path = os.path.abspath(os.path.join(IMAGE_DIR, file))
-            file_url = f"file:///{quote(file_path.replace(os.sep, '/'))}"
-
-            label = file[len(prefix):].replace(".png", "").lstrip("-") or "默认形态"
-            label = label.replace("shiny", "✨ Shiny 版").replace("--", "-")
-            if "Shiny 版" not in label:
-                label = f"🎨 {label}"
-
-            img_html += f"<div><b>{label}</b><br><img src='{file_url}' style='max-width:200px; border-radius:10px;'></div><br>"
-
-    if extra_images:
-        for form in extra_images:
-            for key, label in [("image", "🎨 默认形态"), ("shiny", "✨ Shiny 版")]:
-                file = form.get(key)
-                if not file:
-                    continue
-                file_path = os.path.abspath(os.path.join(IMAGE_DIR, file))
-                file_url = f"file:///{quote(file_path.replace(os.sep, '/'))}"
-                img_html += f"<div><b>{form['name']} - {label}</b><br><img src='{file_url}' style='max-width:200px; border-radius:10px;'></div><br>"
-
-    return img_html
+from modules.query.query_ability import format_ability_html
+from modules.query.query_move import format_move_html
+from modules.query.query_pokemon import format_pokemon_html
+from modules.query.config import POKEMON_DIR, MOVE_DIR, ABILITY_DIR
 
 def normalize(text: str) -> str:
     if not isinstance(text, str):
@@ -154,20 +117,3 @@ def query_local(name: str, category: str, fields: Optional[List[str]] = None) ->
             continue
 
     return False, f"「{name}」の情報は見つかりませんでした。"
-
-def ask_gpt(prompt: str, fields: Optional[List[str]] = None) -> str:
-    keyword = prompt.strip()
-
-    success, content = query_local(keyword, "pokemon", fields=fields)
-    if success:
-        return content + f"<div style='color:gray;'>（来自宝可梦图鉴）</div>"
-
-    success, content = query_local(keyword, "move", fields=fields)
-    if success:
-        return content + f"<div style='color:gray;'>（来自技能图鉴）</div>"
-
-    success, content = query_local(keyword, "ability", fields=fields)
-    if success:
-        return content + f"<div style='color:gray;'>（来自特性图鉴）</div>"
-
-    return f"<div>すみません，「{keyword}」についてはまだ図鑑に登録されていません。</div>"

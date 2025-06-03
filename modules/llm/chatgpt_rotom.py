@@ -41,49 +41,34 @@ def extract_fields(user_input: str) -> list:
 请根据下方的字段说明，从用户的问题中识别他们想要了解的具体信息类型。
 **只返回字段对应的英文关键词列表，按照以下字段列表限定输出**，无需解释、注释或其他额外文字。
 
-【字段列表说明】
-以下是所有可提取的字段，仅可返回以下英文关键词：
+根据问题的上下文推断出该问题指的是宝可梦（pokemon）、技能（move）或特性（ability），然后只输出该类型下的字段关键词。
 
-宝可梦相关字段（category = "pokemon"）：
-- name：名称相关
-- types：属性
-- ability：特性
-- stats：能力值（HP/攻击/防御等）
-- moves：技能（包含等级学习与招式机学习）
-- profile：宝可梦简介
-- flavor_texts：图鉴描述（按世代与版本划分）
-- evolution：进化信息（进化阶段及条件）
-- generation：登场世代
-- image：图像展示
+宝可梦字段（pokemon）：
+["basic",         // 名称、编号、种类、属性、性别比等基础资料
+ "profile",       // 简介文本
+ "types",         // 属性，如火、草等
+ "ability",       // 特性，包括隐藏特性
+ "stats",         // 能力值（HP、攻击、防御等）
+ "moves",         // 技能（等级学习／招式机）
+ "flavor",        // 图鉴描述（世代版本）
+ "evolution",     // 进化链
+ "images"]        // 图片：包括形态图、插画、样子、图片展示、图片长什么样、正面图等
 
-技能（招式）相关字段（category = "move"）：
-- name：名称相关
-- generation：登场世代
-- category：属性 + 类别（如物理/特殊/变化）
-- accuracy：威力、命中、PP
-- attack_range：攻击范围
-- text：简介
-- effect：实战效果
-- info：机制说明
-- pokemon：可学习此技能的宝可梦
+技能字段（move）：
+["generation", "category", "accuracy", "attack_range", "text", "effect", "info", "pokemon"]
 
-特性相关字段（category = "ability"）：
-- name：名称相关
-- generation：登场世代
-- text：简介
-- effect：实战效果
-- info：机制说明
-- count：拥有此特性的宝可梦数量（常规+隐藏）
-- pokemon：拥有此特性的宝可梦列表
+特性字段（ability）：
+["generation", "count", "text", "effect", "info", "pokemon"]
 
----
+例如：
+问题：「飞翔有什么效果？」 → 返回：["effect", "text"]
+问题：「妙蛙种子会什么技能？」→ 返回：["moves"]
+（这只是例子，请不要直接使用，不要每次都返回这几个字段。请根据用户问题来精准判断。）
 
 请根据以下用户问题，判断他们最关心哪些字段：
 用户问题：「{user_input}」
-
-请只返回字段关键词组成的 **JSON 数组**，格式如下：
-["types", "moves", "stats"]
 """
+
 
     try:
         response = client.chat.completions.create(

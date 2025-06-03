@@ -4,8 +4,9 @@ from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
     QTextBrowser, QLineEdit, QPushButton, QLabel, QFileDialog
 )
-from PyQt5.QtGui import QPixmap
+from PyQt5.QtGui import QPixmap, QIcon
 from PyQt5.QtCore import Qt
+from urllib.parse import quote
 
 # 添加项目根目录到 sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -13,52 +14,60 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 # 模块导入
 from modules.chat import ask_gpt
 from modules.vision import describe_image
-from urllib.parse import quote
 
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("洛托姆助手")
+        self.setWindowTitle("洛托姆助手 | Rotom VQA")
         self.setFixedSize(480, 720)
+        self.setWindowIcon(QIcon("assets/rotom_icon.png"))
+
+        bg_path = os.path.join(os.path.dirname(__file__), "assets", "rotom_frame.png")
+        bg_path = os.path.abspath(bg_path).replace("\\", "/")  # Windows 下路径格式处理
 
         # 背景图
         self.bg_label = QLabel(self)
-        self.bg_label.setPixmap(QPixmap("assets/rotom_bg (1).png").scaled(
-            self.size(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation))
+        pixmap = QPixmap(bg_path)
+        self.bg_label.setPixmap(pixmap.scaled(self.size(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation))
         self.bg_label.setGeometry(0, 0, self.width(), self.height())
-        self.bg_label.lower()
+        self.bg_label.raise_()  # 把背景图放到最底层
 
         # 聊天框
         self.chat_display = QTextBrowser(self)
+        self.chat_display.setMaximumHeight(720)
+        self.chat_display.setMaximumWidth(480)
         self.chat_display.setStyleSheet("""
             QTextBrowser {
-                background-color: rgba(255, 255, 255, 200);
-                border-radius: 15px;
-                padding: 10px;
+                background-color: rgba(255, 255, 255, 0);
+                border-radius: 20px;
+                padding: 14px;
                 font-size: 14px;
-                font-family: 'Arial';
+                font-family: 'Segoe UI';
             }
         """)
 
         # 输入框
-        self.input_box = QLineEdit()
+        self.input_box = QLineEdit(self)
         self.input_box.setPlaceholderText("ロトムに話しかけてみよう")
+        self.input_box.setFixedHeight(28)
         self.input_box.setStyleSheet("""
             QLineEdit {
-                padding: 10px;
+                padding: 6px 10px;
                 border-radius: 10px;
                 font-size: 14px;
+                height: 24px;
             }
         """)
 
         # 发送按钮
-        self.send_button = QPushButton("发送")
+        self.send_button = QPushButton("发送", self)
+        self.send_button.setFixedHeight(28)
         self.send_button.setStyleSheet("""
             QPushButton {
                 background-color: #FF4D4D;
                 color: white;
-                border-radius: 15px;
-                padding: 8px 16px;
+                border-radius: 14px;
+                padding: 4px 12px;
                 font-weight: bold;
             }
             QPushButton:hover {
@@ -67,13 +76,13 @@ class MainWindow(QWidget):
         """)
 
         # 上传按钮
-        self.upload_button = QPushButton("📷 图片上传")
+        self.upload_button = QPushButton("📷", self)
+        self.upload_button.setFixedHeight(28)
         self.upload_button.setStyleSheet("""
             QPushButton {
                 background-color: #4CAF50;
                 color: white;
-                border-radius: 15px;
-                padding: 8px 16px;
+                border-radius: 10px;
                 font-weight: bold;
             }
             QPushButton:hover {
@@ -81,18 +90,13 @@ class MainWindow(QWidget):
             }
         """)
 
-        # 输入区域布局
-        input_layout = QHBoxLayout()
-        input_layout.addWidget(self.input_box)
-        input_layout.addWidget(self.send_button)
-        input_layout.addWidget(self.upload_button)
+        # 聊天框：靠上，尺寸合适
+        self.chat_display.setGeometry(60, 165, 360, 505)
 
-        # 主布局
-        layout = QVBoxLayout()
-        layout.addStretch(1)
-        layout.addWidget(self.chat_display, 8)
-        layout.addLayout(input_layout, 1)
-        self.setLayout(layout)
+        # 输入框 + 按钮：靠下排一行（左到右）
+        self.input_box.setGeometry(40, 680, 260, 32)        # 输入框在左
+        self.send_button.setGeometry(310, 680, 60, 32)       # 发送按钮在中
+        self.upload_button.setGeometry(380, 680, 32, 32)     # 上传按钮在右
 
         # 信号连接
         self.send_button.clicked.connect(self.chat)
@@ -104,13 +108,15 @@ class MainWindow(QWidget):
         cursor.movePosition(cursor.End)
 
         align = "left" if side == "left" else "right"
+        bubble_color = "#f0f8ff" if side == "left" else "#c7c5b3"
 
         html = (
             f"<table width='100%'><tr><td align='{align}'>"
-            f"<div style='padding:6px; border-radius:10px; font-size:14px; font-family:Arial; "
-            f"display:inline-block; max-width:80%; line-height:1.3; margin:0;'>"
+            f"<div style='padding:10px; border-radius:12px; font-size:14px; "
+            f"font-family:'Segoe UI'; display:inline-block; max-width:80%; "
+            f"background-color:{bubble_color}; margin:6px 0;'>"
         )
-        
+
         if is_html:
             html += f"<b style='color:gray'>{sender}：</b><br>{text}</div></td></tr></table><br>"
         else:
@@ -125,14 +131,10 @@ class MainWindow(QWidget):
             return
         self.input_box.clear()
 
-        # 用户提问（右侧）
         self.append_message("你", user_input, "right")
-
-        # 洛托姆回复（HTML）
         response_html = ask_gpt(user_input)
         self.append_message("ロトム", response_html, "left", is_html=True)
 
-        # 自动滚动到底部
         self.chat_display.verticalScrollBar().setValue(
             self.chat_display.verticalScrollBar().maximum()
         )
@@ -140,26 +142,14 @@ class MainWindow(QWidget):
     def upload_image(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "选择图片", "", "Images (*.png *.jpg *.jpeg)")
         if file_path:
-            # 将本地路径转换为 file URL
             file_url = f"file:///{quote(file_path.replace(os.sep, '/'))}"
-
-            # 限制图像显示大小，最大高度 300px，最大宽度不超过容器
             img_html = (
-                f"<div style='max-width:320px;'>"
-                f"<img src='{file_url}' style='width:100%; height:auto; border-radius:10px;'>"
+                f"<div style='max-width:280px; margin-top:10px;'>"
+                f"<img src='{file_url}' style='width:100%; height:auto; border-radius:12px; box-shadow:0 0 8px #ccc;'>"
                 f"</div>"
-                )
-
-            # 用户上传信息和图片显示
+            )
             self.append_message("你", f"上传了一张图片<br>{img_html}", "right", is_html=True)
 
-            # 图像识别描述
             description = describe_image(file_path).replace("\n", "<br>")
             self.append_message("ロトム", description, "left", is_html=True)
 
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = MainWindow()
-    window.show()
-    sys.exit(app.exec_())

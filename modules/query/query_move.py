@@ -1,52 +1,61 @@
-from typing import List, Tuple, Optional
+from typing import List, Optional
 
 def format_move_html(data: dict, fields: Optional[List[str]] = None) -> str:
     name_zh = data.get("name", "未知")
     name_jp = data.get("name_jp", "-")
     name_en = data.get("name_en", "-")
-    generation = data.get("generation", "未知世代")
-    move_type = data.get("type", "—")
-    category = data.get("category", "—")
-    power = data.get("power", "—")
-    accuracy = data.get("accuracy", "—")
-    pp = data.get("pp", "—")
-    text = data.get("text", "无介绍")
-    effect = data.get("effect", "").replace("\n", "<br>")
-    attack_range = data.get("range", "—")
 
+    blocks = []
+    
+    # 检查是否展示所有字段
     show_all = fields is None
-    html = f'''<div align="left"><span style="padding: 10px; display:block;">
-<b>ロトム：</b><br>
-🔥 收到！这是技能 <b>{name_zh}</b>（{name_jp} / {name_en}）的完整记录～📒<br><br>
-'''
 
+    # 标题
+    blocks.append(f"<b>🧬 发现了一个技能：{name_zh}（{name_jp} / {name_en}）✨</b><br><br>")
+
+    # 世代
     if show_all or "generation" in fields:
-        html += f"📅 <b>登场世代：</b>{generation}<br>"
+        generation = data.get("generation", "未知世代")
+        blocks.append(f"📅 <b>登场世代：</b>{generation}<br>")
 
+    # 属性 & 类别
     if show_all or "category" in fields:
-        html += f"🔰 <b>属性：</b>{move_type}　📦 <b>类别：</b>{category}<br>"
+        move_type = data.get("type", "—")
+        category = data.get("category", "—")
+        blocks.append(f"🔰 <b>属性：</b>{move_type}　📦 <b>类别：</b>{category}<br>")
 
+    # 威力 命中 PP
     if show_all or "accuracy" in fields:
-        html += f"⚡ <b>威力：</b>{power}　🎯 <b>命中：</b>{accuracy}　⏳ <b>PP：</b>{pp}<br>"
+        power = data.get("power", "—")
+        accuracy = data.get("accuracy", "—")
+        pp = data.get("pp", "—")
+        blocks.append(f"⚡ <b>威力：</b>{power}　🎯 <b>命中：</b>{accuracy}　⏳ <b>PP：</b>{pp}<br>")
 
+    # 攻击范围
     if show_all or "attack_range" in fields:
-        html += f"🎯 <b>攻击范围：</b>{attack_range}<br><br>"
+        attack_range = data.get("range", "—")
+        blocks.append(f"🎯 <b>攻击范围：</b>{attack_range}<br>")
 
+    # 简介
     if show_all or "text" in fields:
-        html += f"📝 <b>技能简介：</b>{text}<br>"
+        text = data.get("text", "无介绍")
+        blocks.append(f"<br>📝 <b>技能简介：</b><br>{text}")
 
+    # 实战效果
     if show_all or "effect" in fields:
-        html += f"🎈 <b>实际效果：</b><br>{effect or '暂无说明'}<br>"
+        effect = data.get("effect", "").replace("\n", "<br>")
+        blocks.append(f"<br>🎈 <b>实际效果：</b><br>{effect or '暂无说明'}")
 
+    # 机制说明
     if show_all or "info" in fields:
         info_list = data.get("info", [])
-        info_html = (
-            "<ul style='margin-left: 1em;'>"
-            + "".join(f"<li>{i}</li>" for i in info_list)
-            + "</ul>"
-        ) if info_list else "暂无机制说明"
-        html += f"📚 <b>机制说明：</b><br>{info_html}<br><br>"
+        if info_list:
+            info_html = "<ul style='margin-left:1em;'>" + "".join(f"<li>{item}</li>" for item in info_list) + "</ul>"
+        else:
+            info_html = "暂无机制说明"
+        blocks.append(f"<br>📚 <b>机制说明：</b><br>{info_html}")
 
+    # 可学习宝可梦
     if "pokemon" in fields:
         pokemon_data = data.get("pokemon", {})
         has_pokemon = any(pokemon_data.get(key) for key in ["level", "machine", "egg", "tutor"])
@@ -66,7 +75,13 @@ def format_move_html(data: dict, fields: Optional[List[str]] = None) -> str:
             learn_html += "</ul>"
         else:
             learn_html = "暂无学习此招式的宝可梦。"
-        html += f"📖 <b>可学习宝可梦：</b><br>{learn_html}"
 
-    html += "</span></div><br>"
-    return html
+        blocks.append(f"<br>📖 <b>可学习宝可梦：</b><br>{learn_html}")
+
+    # 拼接输出
+    return f'''
+<div align="left">
+<span style="padding: 10px; display:block;">
+{''.join(blocks)}
+</span></div><br>
+'''
