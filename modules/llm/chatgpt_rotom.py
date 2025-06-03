@@ -1,11 +1,13 @@
 # rotom_chatgpt.py
 from openai import OpenAI
+from dotenv import load_dotenv
 import os
 import re
 import json
 
 
 # 设置OpenAI API 密钥
+load_dotenv()  # 加载 .env 文件
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") or "your-openai-api-key-here"
 
 # 初始化客户端（使用 gpt-4o 模型）
