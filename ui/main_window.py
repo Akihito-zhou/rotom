@@ -1,8 +1,10 @@
 import sys
 import os
 import threading
+import cv2
+import time
 from PyQt5.QtWidgets import (
-    QWidget, QTextBrowser, QLineEdit, QPushButton, QLabel, QFileDialog
+    QWidget, QTextBrowser, QLineEdit, QPushButton, QLabel, QFileDialog, QMenu
 )
 from PyQt5.QtGui import QPixmap, QIcon
 from PyQt5.QtCore import Qt, QEvent
@@ -53,7 +55,7 @@ class MainWindow(QWidget):
                 border-radius: 20px;
                 padding: 14px;
                 font-size: 14px;
-                font-family: 'Segoe UI';
+                font-family: 'Noto Sans', 'Noto Sans SC', 'Noto Sans JP', sans-serif;
             }
         """)
 
@@ -67,6 +69,7 @@ class MainWindow(QWidget):
                 border-radius: 10px;
                 font-size: 14px;
                 height: 24px;
+                font-family: 'Noto Sans', 'Noto Sans SC', 'Noto Sans JP', sans-serif;
             }
         """)
 
@@ -80,6 +83,7 @@ class MainWindow(QWidget):
                 border-radius: 14px;
                 padding: 4px 12px;
                 font-weight: bold;
+                font-family: 'Noto Sans', 'Noto Sans SC', 'Noto Sans JP', sans-serif;
             }
             QPushButton:hover {
                 background-color: #FF7373;
@@ -95,11 +99,19 @@ class MainWindow(QWidget):
                 color: white;
                 border-radius: 10px;
                 font-weight: bold;
+                font-family: 'Noto Sans', 'Noto Sans SC', 'Noto Sans JP', sans-serif;                        
             }
             QPushButton:hover {
                 background-color: #66BB6A;
             }
         """)
+
+        # 创建菜单
+        upload_menu = QMenu(self)
+        upload_menu.addAction("📁 上传图片", self.upload_image)
+        upload_menu.addAction("📸 拍照识别", self.capture_from_camera)
+
+        self.upload_button.setMenu(upload_menu)
 
         # 语音按钮
         self.voice_button = QPushButton("🎤", self)
@@ -110,6 +122,7 @@ class MainWindow(QWidget):
                 color: white;
                 border-radius: 10px;
                 font-weight: bold;
+                font-family: 'Noto Sans', 'Noto Sans SC', 'Noto Sans JP', sans-serif;                        
             }
             QPushButton:hover {
                 background-color: #42A5F5;
@@ -144,7 +157,7 @@ class MainWindow(QWidget):
         html = (
             f"<table width='100%'><tr><td align='{align}'>"
             f"<div style='padding:10px; border-radius:12px; font-size:14px; "
-            f"font-family:'Segoe UI'; display:inline-block; max-width:80%; "
+            f"font-family: 'Noto Sans', 'Noto Sans SC', 'Noto Sans JP', sans-serif; display:inline-block; max-width:80%; "
             f"background-color:{bubble_color}; margin:6px 0;'>"
         )
 
@@ -190,6 +203,7 @@ class MainWindow(QWidget):
                 img_html = f"<div style='max-width:280px;'><img src='{file_url}' style='width:100%; border-radius:12px; box-shadow:0 0 8px #ccc;'></div>"
                 self.append_message("你", f"上传了一张图片<br>{img_html}", "right", is_html=True)
 
+        #上传图片
     def upload_image(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "选择图片", "", "Images (*.png *.jpg *.jpeg)")
         if file_path:
@@ -203,6 +217,49 @@ class MainWindow(QWidget):
 
             description = describe_image(file_path).replace("\n", "<br>")
             self.append_message("ロトム", description, "left", is_html=True)
+    
+        # 拍照识别
+    def capture_from_camera(self):
+
+        cap = cv2.VideoCapture(0)
+        if not cap.isOpened():
+            self.append_message("系统", "❌ 无法访问摄像头", "left")
+            return
+
+        self.append_message("系统", "📸 请对准宝可梦，按任意键拍照...", "left")
+
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                continue
+            cv2.imshow("Rotom 识别助手 - 按任意键拍照", frame)
+            if cv2.waitKey(1) != -1:
+                break
+
+        cap.release()
+        cv2.destroyAllWindows()
+
+        # 保存图像到临时文件
+        timestamp = int(time.time())
+        image_path = f"captured_{timestamp}.jpg"
+        cv2.imwrite(image_path, frame)
+
+        # 图像识别
+        from modules.vision import describe_image
+        result_html = describe_image(image_path).replace("\n", "<br>")
+
+        # 显示图片和识别结果
+        from urllib.parse import quote
+        from os.path import abspath
+        file_url = f"file:///{quote(abspath(image_path).replace(os.sep, '/'))}"
+        img_html = (
+            f"<div style='max-width:280px; margin-top:10px;'>"
+            f"<img src='{file_url}' style='width:100%; height:auto; border-radius:12px; box-shadow:0 0 8px #ccc;'>"
+            f"</div>"
+        )
+        self.append_message("你", f"拍摄了一张图片<br>{img_html}", "right", is_html=True)
+        self.append_message("ロトム", result_html, "left", is_html=True)
+
 
     def process_image_and_question(self, file_path, user_question):
         if user_question == "":
