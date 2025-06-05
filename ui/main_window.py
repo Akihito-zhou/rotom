@@ -12,7 +12,6 @@ from modules.pokemon_images_detection.find_match import find_best_match
 from modules.chat import query_local
 from modules.llm.chatgpt_rotom import ask_chatgpt_with_image
 from modules.intent import extract_entity_name, extract_fields
-from modules.context_manager import ContextManager
 from modules.voice import VoiceRecorder
 
 # 添加项目根目录到 sys.path
