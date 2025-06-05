@@ -4,7 +4,7 @@ import threading
 import cv2
 import time
 from PyQt5.QtWidgets import (
-    QWidget, QTextBrowser, QLineEdit, QPushButton, QLabel, QFileDialog, QMenu
+    QWidget, QTextBrowser, QLineEdit, QPushButton, QLabel, QFileDialog, QMenu, QDialog
 )
 from PyQt5.QtGui import QPixmap, QIcon
 from PyQt5.QtCore import Qt, QEvent
@@ -15,6 +15,7 @@ from modules.chat import query_local
 from modules.llm.chatgpt_rotom import ask_chatgpt_with_image
 from modules.intent import extract_entity_name, extract_fields
 from modules.voice import VoiceRecorder
+from modules.vision import CameraCaptureDialog
 
 # 添加项目根目录到 sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -220,45 +221,24 @@ class MainWindow(QWidget):
     
         # 拍照识别
     def capture_from_camera(self):
+        dialog = CameraCaptureDialog(self)
+        if dialog.exec_() == QDialog.Accepted and dialog.captured_path:
+            image_path = dialog.captured_path
 
-        cap = cv2.VideoCapture(0)
-        if not cap.isOpened():
-            self.append_message("系统", "❌ 无法访问摄像头", "left")
-            return
+            from urllib.parse import quote
+            from os.path import abspath
+            file_url = f"file:///{quote(abspath(image_path).replace(os.sep, '/'))}"
 
-        self.append_message("系统", "📸 请对准宝可梦，按任意键拍照...", "left")
+            img_html = (
+                f"<div style='max-width:280px; margin-top:10px;'>"
+                f"<img src='{file_url}' style='width:100%; height:auto; border-radius:12px; box-shadow:0 0 8px #ccc;'>"
+                f"</div>"
+            )
+            self.append_message("你", f"拍摄了一张图片<br>{img_html}", "right", is_html=True)
 
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                continue
-            cv2.imshow("Rotom 识别助手 - 按任意键拍照", frame)
-            if cv2.waitKey(1) != -1:
-                break
-
-        cap.release()
-        cv2.destroyAllWindows()
-
-        # 保存图像到临时文件
-        timestamp = int(time.time())
-        image_path = f"captured_{timestamp}.jpg"
-        cv2.imwrite(image_path, frame)
-
-        # 图像识别
-        from modules.vision import describe_image
-        result_html = describe_image(image_path).replace("\n", "<br>")
-
-        # 显示图片和识别结果
-        from urllib.parse import quote
-        from os.path import abspath
-        file_url = f"file:///{quote(abspath(image_path).replace(os.sep, '/'))}"
-        img_html = (
-            f"<div style='max-width:280px; margin-top:10px;'>"
-            f"<img src='{file_url}' style='width:100%; height:auto; border-radius:12px; box-shadow:0 0 8px #ccc;'>"
-            f"</div>"
-        )
-        self.append_message("你", f"拍摄了一张图片<br>{img_html}", "right", is_html=True)
-        self.append_message("ロトム", result_html, "left", is_html=True)
+            from modules.vision import describe_image
+            result_html = describe_image(image_path).replace("\n", "<br>")
+            self.append_message("ロトム", result_html, "left", is_html=True)
 
 
     def process_image_and_question(self, file_path, user_question):

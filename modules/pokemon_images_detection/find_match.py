@@ -36,18 +36,11 @@ def find_best_match(query_image_path, topk=1):
 
     return sims[:topk]
 
-# ==== 调用样例 ====
-if __name__ == "__main__":
-    import sys
-    if len(sys.argv) < 2:
-        print("❗ 用法: python find_match.py <image_path>")
-        exit(1)
+def find_best_match_from_frame(frame, topk=1):
+    from modules.pokemon_images_detection.find_match import find_best_match
+    import cv2
+    import tempfile
 
-    query_path = sys.argv[1]
-    matches = find_best_match(query_path)
-
-    for path, score in matches:
-        label = path.split(os.sep)[-2]  # 文件夹名作为类名
-        print(f"✅ 最相似宝可梦: {label}")
-        print(f"📍 图像路径: {path}")
-        print(f"🎯 相似度: {score:.4f}")
+    with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+        cv2.imwrite(tmp.name, frame)
+        return find_best_match(tmp.name, topk=topk)
