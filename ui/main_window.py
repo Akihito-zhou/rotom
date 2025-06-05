@@ -29,7 +29,6 @@ class MainWindow(QWidget):
         self.setWindowIcon(QIcon("assets/rotom_icon.png"))
         self.setAcceptDrops(True)  # 启用拖拽功能
         self.pending_image = None  # 用于存储待处理的图片路径
-        self.context_manager = ContextManager()  # 初始化上下文系统
         self.voice_recorder = VoiceRecorder()
         self.recording_thread = None
 
