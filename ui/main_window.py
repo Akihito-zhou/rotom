@@ -1,12 +1,19 @@
 import sys
 import os
+import threading
 from PyQt5.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QHBoxLayout,
-    QTextBrowser, QLineEdit, QPushButton, QLabel, QFileDialog
+    QWidget, QTextBrowser, QLineEdit, QPushButton, QLabel, QFileDialog
 )
 from PyQt5.QtGui import QPixmap, QIcon
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QEvent
 from urllib.parse import quote
+from modules.multi_language.language_handler import generate_multilingual_response
+from modules.pokemon_images_detection.find_match import find_best_match
+from modules.chat import query_local
+from modules.llm.chatgpt_rotom import ask_chatgpt_with_image
+from modules.intent import extract_entity_name, extract_fields
+from modules.context_manager import ContextManager
+from modules.voice import VoiceRecorder
 
 # 添加项目根目录到 sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -21,6 +28,12 @@ class MainWindow(QWidget):
         self.setWindowTitle("洛托姆助手 | Rotom VQA")
         self.setFixedSize(480, 720)
         self.setWindowIcon(QIcon("assets/rotom_icon.png"))
+        self.setAcceptDrops(True)  # 启用拖拽功能
+        self.pending_image = None  # 用于存储待处理的图片路径
+        self.context_manager = ContextManager()  # 初始化上下文系统
+        self.voice_recorder = VoiceRecorder()
+        self.recording_thread = None
+
 
         bg_path = os.path.join(os.path.dirname(__file__), "assets", "rotom_frame.png")
         bg_path = os.path.abspath(bg_path).replace("\\", "/")  # Windows 下路径格式处理
@@ -90,6 +103,24 @@ class MainWindow(QWidget):
             }
         """)
 
+        # 语音按钮
+        self.voice_button = QPushButton("🎤", self)
+        self.voice_button.setFixedHeight(28)
+        self.voice_button.setStyleSheet("""
+            QPushButton {
+                background-color: #2196F3;
+                color: white;
+                border-radius: 10px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #42A5F5;
+            }
+        """)
+        # 启用事件监听
+        self.voice_button.setMouseTracking(True)
+        self.voice_button.installEventFilter(self)
+
         # 聊天框：靠上，尺寸合适
         self.chat_display.setGeometry(60, 165, 360, 505)
 
@@ -97,11 +128,13 @@ class MainWindow(QWidget):
         self.input_box.setGeometry(40, 680, 260, 32)        # 输入框在左
         self.send_button.setGeometry(310, 680, 60, 32)       # 发送按钮在中
         self.upload_button.setGeometry(380, 680, 32, 32)     # 上传按钮在右
+        self.voice_button.setGeometry(420, 680, 32, 32)
 
         # 信号连接
         self.send_button.clicked.connect(self.chat)
         self.input_box.returnPressed.connect(self.chat)
         self.upload_button.clicked.connect(self.upload_image)
+        self.voice_button.installEventFilter(self)
 
     def append_message(self, sender: str, text: str, side: str, is_html=False):
         cursor = self.chat_display.textCursor()
@@ -127,17 +160,37 @@ class MainWindow(QWidget):
 
     def chat(self):
         user_input = self.input_box.text().strip()
-        if not user_input:
-            return
         self.input_box.clear()
 
-        self.append_message("你", user_input, "right")
-        response_html = ask_gpt(user_input)
-        self.append_message("ロトム", response_html, "left", is_html=True)
+        if self.pending_image:
+            # 有图片待处理
+            file_path = self.pending_image
+            self.pending_image = None  # 清空暂存路径
+            self.process_image_and_question(file_path, user_input)
+        else:
+            # 无图片，纯文字输入
+            self.append_message("你", user_input, "right")
+            response_html = ask_gpt(user_input)
+            self.append_message("ロトム", response_html, "left", is_html=True)
 
         self.chat_display.verticalScrollBar().setValue(
             self.chat_display.verticalScrollBar().maximum()
         )
+
+
+        # 添加拖拽事件
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+
+    def dropEvent(self, event):
+        for url in event.mimeData().urls():
+            file_path = url.toLocalFile()
+            if file_path.lower().endswith(('.png', '.jpg', '.jpeg')):
+                self.pending_image = file_path  # 暂存图片路径
+                file_url = f"file:///{quote(file_path.replace(os.sep, '/'))}"
+                img_html = f"<div style='max-width:280px;'><img src='{file_url}' style='width:100%; border-radius:12px; box-shadow:0 0 8px #ccc;'></div>"
+                self.append_message("你", f"上传了一张图片<br>{img_html}", "right", is_html=True)
 
     def upload_image(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "选择图片", "", "Images (*.png *.jpg *.jpeg)")
@@ -152,4 +205,87 @@ class MainWindow(QWidget):
 
             description = describe_image(file_path).replace("\n", "<br>")
             self.append_message("ロトム", description, "left", is_html=True)
+
+    def process_image_and_question(self, file_path, user_question):
+        if user_question == "":
+            # 无问题，默认查询基础信息
+            description = describe_image(file_path)
+            self.append_message("ロトム", description, "left", is_html=True)
+        else:
+            # 有问题，根据问题查询对应字段或fallback到chatgpt
+            response_html = self.get_response_based_on_image(file_path, user_question)
+            self.append_message("你", user_question, "right")
+            self.append_message("ロトム", response_html, "left", is_html=True)
+
+
+    def get_response_based_on_image(self, file_path, user_question):
+
+        # Step 1: 使用 CLIP 做图像识别
+        matches = find_best_match(file_path)
+        if not matches:
+            print("[DEBUG] 图像识别失败：没有找到匹配的宝可梦")
+            answer = ask_chatgpt_with_image(user_question, [file_path])
+            translated = generate_multilingual_response(answer, user_question)
+            return f"🌐 来自ChatGPT：<br>{translated}"
+
+        matched_path, score = matches[0]
+        matched_name = os.path.basename(os.path.dirname(matched_path))
+
+        # Step 2: 提取用户意图
+        keyword = extract_entity_name(user_question)
+        fields = extract_fields(user_question)
+
+        # Debug 输出
+        print(f"[DEBUG] 用户问题：「{user_question}」")
+        print(f"[DEBUG] 图像识别结果：{matched_name}，相似度：{score:.2f}")
+        print(f"[DEBUG] 提取的实体名：{keyword if keyword else '(未识别)'}")
+        print(f"[DEBUG] 提取的字段意图：{fields if fields else '(无字段)'}")
+
+        # Step 3: 若用户未提及关键词，默认使用图像识别的名称
+        used_fallback = False
+        if not keyword:
+            keyword = matched_name
+            used_fallback = True
+
+        if used_fallback:
+            print(f"[DEBUG] 实体名由图像识别补全为：{keyword}")
+
+        # Step 4: 本地图鉴查询
+        found, html = query_local(keyword, "pokemon", fields=fields)
+        if found:
+            return f"✅ 找到本地宝可梦：<b>{keyword}</b><br>{html}"
+        else:
+            print(f"[DEBUG] 本地图鉴未找到「{keyword}」的相关信息，fallback 到 ChatGPT")
+            answer = ask_chatgpt_with_image(user_question, [file_path])
+            translated = generate_multilingual_response(answer, user_question)
+            return f"{translated}"
+
+    def eventFilter(self, source, event):
+        if source == self.voice_button:
+            if event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
+                self.start_voice_recording()
+                return True
+            elif event.type() == QEvent.MouseButtonRelease and event.button() == Qt.LeftButton:
+                self.stop_voice_recording()
+                return True
+        return super().eventFilter(source, event)
+
+    def start_voice_recording(self):
+        self.append_message("系统", "🎙️ 按住录音中，请开始说话...", "left")
+        self.voice_recorder = VoiceRecorder()
+        self.recording_thread = threading.Thread(target=self.voice_recorder.start_recording)
+        self.recording_thread.start()
+
+    def stop_voice_recording(self):
+        self.voice_recorder.stop_recording()
+        self.recording_thread.join()
+
+        result = self.voice_recorder.transcribe()
+        if result.startswith("❌"):
+            self.append_message("系统", result, "left")
+        else:
+            self.input_box.setText(result)
+            self.chat()
+
+
 

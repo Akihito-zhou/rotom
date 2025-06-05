@@ -117,3 +117,4 @@ def query_local(name: str, category: str, fields: Optional[List[str]] = None) ->
             continue
 
     return False, f"「{name}」の情報は見つかりませんでした。"
+

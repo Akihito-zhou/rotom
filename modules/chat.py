@@ -1,14 +1,15 @@
 # chat.py
+import sys
+import os
+
+# 将 rotom 目录加入 sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from modules.query.query_all import query_local, normalize
-from modules.llm.chatgpt_rotom import extract_entity_name, extract_fields, ask_chatgpt
+from modules.llm.chatgpt_rotom import ask_chatgpt
+from modules.intent import extract_entity_name, extract_fields
 from modules.multi_language.language_handler import generate_multilingual_response
-
-CATEGORY_FIELDS = {
-    "pokemon": ["basic", "profile", "types", "ability", "stats", "moves", "flavor", "evolution"],
-    "move": ["generation", "category", "accuracy", "attack_range", "text", "effect", "info", "pokemon"],
-    "ability": ["generation", "count", "text", "effect", "info", "pokemon"]
-}
+from modules.constants import CATEGORY_FIELDS
 
 def ask_gpt(prompt: str) -> str:
     prompt_clean = normalize(prompt)

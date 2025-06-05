@@ -55,7 +55,7 @@ def deepl_translate(html: str, target_lang: str) -> str:
                     print(f"[翻译失败片段] {elem}: {e}")
 
         prefix = language_prefix.get(normalized, f"[{target_lang}]")
-        return f"{prefix}<br>{str(soup)}"
+        return str(soup)
 
     except Exception as e:
         return f"[翻译失败: {e}]"

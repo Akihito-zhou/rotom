@@ -1,6 +1,6 @@
 import re
 from langdetect import detect
-from modules.llm.chatgpt_rotom import extract_entity_name
+from modules.intent import extract_entity_name
 from modules.query.query_all import query_local  # 实体判断所需
 
 # 支持的语言映射
@@ -40,31 +40,29 @@ def is_mostly_japanese(text: str) -> bool:
 def detect_input_language(text: str) -> str:
     text = text.strip()
 
-    # 英文实体判断
+    # ✅ 强化日语识别：只要含有假名（平假名 or 片假名），优先认定为日语
+    if re.search(r"[\u3040-\u309F\u30A0-\u30FF]", text):  # 平假名 + 片假名
+        return "ja"
+
+    # ✅ 英文实体判断
     entity = extract_entity_name(text)
-    if entity and is_single_english_word(entity):
+    if entity and re.fullmatch(r"[A-Za-z\-]+", entity):
         for category in ["pokemon", "move", "ability"]:
             found, _ = query_local(entity.lower(), category, fields=[])
             if found:
                 return "en"
 
-    # 日文实体判断
-    entity = extract_entity_name(text)
-    if entity and is_mostly_japanese(text):
-        for category in ["pokemon", "move", "ability"]:
-            found, _ = query_local(entity, category, fields=[])
-            if found:
-                return "ja"
-
-    # 太短 ➜ 默认中文
-    if len(text.split()) < 3:
-        return "zh"
-
-    # fallback: 使用 langdetect
+    # ✅ fallback to langdetect
     try:
-        return detect(text)
+        lang = detect(text)
+
+        # langdetect 有时会把纯汉字误判为日语
+        if lang == "ja" and re.fullmatch(r"[\u4E00-\u9FFF]+", text):
+            return "zh"
+        return lang
     except:
         return "zh"
+
 
 def detect_input_language_with_label(text: str) -> tuple[str, str]:
     """返回语言代码和可显示语言名"""
