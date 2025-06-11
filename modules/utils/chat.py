@@ -7,9 +7,9 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from modules.query.query_all import query_local, normalize
 from modules.llm.chatgpt_rotom import ask_chatgpt
-from modules.intent import extract_entity_name, extract_fields
+from modules.utils.intent import extract_entity_name, extract_fields
 from modules.multi_language.language_handler import generate_multilingual_response
-from modules.constants import CATEGORY_FIELDS
+from modules.utils.constants import CATEGORY_FIELDS
 
 def ask_gpt(prompt: str) -> str:
     prompt_clean = normalize(prompt)

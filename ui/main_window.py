@@ -1,8 +1,6 @@
 import sys
 import os
 import threading
-import cv2
-import time
 from PyQt5.QtWidgets import (
     QWidget, QTextBrowser, QLineEdit, QPushButton, QLabel, QFileDialog, QMenu, QDialog
 )
@@ -11,18 +9,19 @@ from PyQt5.QtCore import Qt, QEvent
 from urllib.parse import quote
 from modules.multi_language.language_handler import generate_multilingual_response
 from modules.pokemon_images_detection.find_match import find_best_match
-from modules.chat import query_local
+from modules.utils.chat import query_local
 from modules.llm.chatgpt_rotom import ask_chatgpt_with_image
-from modules.intent import extract_entity_name, extract_fields
-from modules.voice import VoiceRecorder
-from modules.vision import CameraCaptureDialog
+from modules.utils.intent import extract_entity_name, extract_fields
+from modules.utils.voice import VoiceRecorder
+from modules.utils.vision import CameraCaptureDialog
+from modules.sfx.sfx import sfx
 
 # 添加项目根目录到 sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # 模块导入
-from modules.chat import ask_gpt
-from modules.vision import describe_image
+from modules.utils.chat import ask_gpt
+from modules.utils.vision import describe_image
 
 class MainWindow(QWidget):
     def __init__(self):
@@ -143,9 +142,13 @@ class MainWindow(QWidget):
         self.voice_button.setGeometry(420, 680, 32, 32)
 
         # 信号连接
+        self.send_button.clicked.connect(lambda: sfx.play(sfx.click))
         self.send_button.clicked.connect(self.chat)
+        self.input_box.returnPressed.connect(lambda: sfx.play(sfx.click))
         self.input_box.returnPressed.connect(self.chat)
+        self.upload_button.clicked.connect(lambda: sfx.play(sfx.click))
         self.upload_button.clicked.connect(self.upload_image)
+        self.voice_button.clicked.connect(lambda: sfx.play(sfx.click))
         self.voice_button.installEventFilter(self)
 
     def append_message(self, sender: str, text: str, side: str, is_html=False):
@@ -171,6 +174,7 @@ class MainWindow(QWidget):
         self.chat_display.setTextCursor(cursor)
 
     def chat(self):
+        sfx.play(sfx.send)
         user_input = self.input_box.text().strip()
         self.input_box.clear()
 
@@ -206,6 +210,7 @@ class MainWindow(QWidget):
 
         #上传图片
     def upload_image(self):
+        sfx.play(sfx.send)
         file_path, _ = QFileDialog.getOpenFileName(self, "选择图片", "", "Images (*.png *.jpg *.jpeg)")
         if file_path:
             file_url = f"file:///{quote(file_path.replace(os.sep, '/'))}"
@@ -221,6 +226,7 @@ class MainWindow(QWidget):
     
         # 拍照识别
     def capture_from_camera(self):
+        sfx.play(sfx.shutter)
         dialog = CameraCaptureDialog(self)
         if dialog.exec_() == QDialog.Accepted and dialog.captured_path:
             image_path = dialog.captured_path
@@ -236,7 +242,7 @@ class MainWindow(QWidget):
             )
             self.append_message("你", f"拍摄了一张图片<br>{img_html}", "right", is_html=True)
 
-            from modules.vision import describe_image
+            from modules.utils.vision import describe_image
             result_html = describe_image(image_path).replace("\n", "<br>")
             self.append_message("ロトム", result_html, "left", is_html=True)
 
@@ -306,12 +312,14 @@ class MainWindow(QWidget):
         return super().eventFilter(source, event)
 
     def start_voice_recording(self):
+        sfx.play(sfx.voice_start)
         self.append_message("系统", "🎙️ 按住录音中，请开始说话...", "left")
         self.voice_recorder = VoiceRecorder()
         self.recording_thread = threading.Thread(target=self.voice_recorder.start_recording)
         self.recording_thread.start()
 
     def stop_voice_recording(self):
+        sfx.play(sfx.voice_end)
         self.voice_recorder.stop_recording()
         self.recording_thread.join()
 

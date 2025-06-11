@@ -1,6 +1,6 @@
 import re
 from langdetect import detect
-from modules.intent import extract_entity_name
+from modules.utils.intent import extract_entity_name
 from modules.query.query_all import query_local  # 实体判断所需
 
 # 支持的语言映射
@@ -56,9 +56,14 @@ def detect_input_language(text: str) -> str:
     try:
         lang = detect(text)
 
-        # langdetect 有时会把纯汉字误判为日语
+        # ❗ 修正误判：纯汉字被误识为日语
         if lang == "ja" and re.fullmatch(r"[\u4E00-\u9FFF]+", text):
             return "zh"
+
+        # ❗ 修正误判：langdetect 会输出 ko / tl / vi 等意外语言
+        if lang not in ["zh", "en", "ja"]:
+            return "zh"
+
         return lang
     except:
         return "zh"
