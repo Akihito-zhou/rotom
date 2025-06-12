@@ -142,13 +142,9 @@ class MainWindow(QWidget):
         self.voice_button.setGeometry(420, 680, 32, 32)
 
         # 信号连接
-        self.send_button.clicked.connect(lambda: sfx.play(sfx.click))
         self.send_button.clicked.connect(self.chat)
-        self.input_box.returnPressed.connect(lambda: sfx.play(sfx.click))
         self.input_box.returnPressed.connect(self.chat)
-        self.upload_button.clicked.connect(lambda: sfx.play(sfx.click))
         self.upload_button.clicked.connect(self.upload_image)
-        self.voice_button.clicked.connect(lambda: sfx.play(sfx.click))
         self.voice_button.installEventFilter(self)
 
     def append_message(self, sender: str, text: str, side: str, is_html=False):
@@ -162,6 +158,7 @@ class MainWindow(QWidget):
             f"<table width='100%'><tr><td align='{align}'>"
             f"<div style='padding:10px; border-radius:12px; font-size:14px; "
             f"font-family: 'Noto Sans', 'Noto Sans SC', 'Noto Sans JP', sans-serif; display:inline-block; max-width:80%; "
+            f"word-wrap: break-word; "
             f"background-color:{bubble_color}; margin:6px 0;'>"
         )
 
@@ -174,7 +171,11 @@ class MainWindow(QWidget):
         self.chat_display.setTextCursor(cursor)
 
     def chat(self):
-        sfx.play(sfx.send)
+        try:
+            sfx.play(sfx.send)
+        except Exception as e:
+            print(f"Error playing sound: {e}")
+            
         user_input = self.input_box.text().strip()
         self.input_box.clear()
 
@@ -193,8 +194,6 @@ class MainWindow(QWidget):
             self.chat_display.verticalScrollBar().maximum()
         )
 
-
-        # 添加拖拽事件
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
@@ -206,11 +205,14 @@ class MainWindow(QWidget):
                 self.pending_image = file_path  # 暂存图片路径
                 file_url = f"file:///{quote(file_path.replace(os.sep, '/'))}"
                 img_html = f"<div style='max-width:280px;'><img src='{file_url}' style='width:100%; border-radius:12px; box-shadow:0 0 8px #ccc;'></div>"
-                self.append_message("你", f"上传了一张图片<br>{img_html}", "right", is_html=True)
+                self.append_message("你", f"{img_html}", "right", is_html=True)
 
-        #上传图片
     def upload_image(self):
-        sfx.play(sfx.send)
+        try:
+            sfx.play(sfx.click)
+        except Exception as e:
+            print(f"Error playing sound: {e}")
+            
         file_path, _ = QFileDialog.getOpenFileName(self, "选择图片", "", "Images (*.png *.jpg *.jpeg)")
         if file_path:
             file_url = f"file:///{quote(file_path.replace(os.sep, '/'))}"
@@ -219,14 +221,17 @@ class MainWindow(QWidget):
                 f"<img src='{file_url}' style='width:100%; height:auto; border-radius:12px; box-shadow:0 0 8px #ccc;'>"
                 f"</div>"
             )
-            self.append_message("你", f"上传了一张图片<br>{img_html}", "right", is_html=True)
+            self.append_message("你", f"{img_html}", "right", is_html=True)
 
             description = describe_image(file_path).replace("\n", "<br>")
             self.append_message("ロトム", description, "left", is_html=True)
     
-        # 拍照识别
     def capture_from_camera(self):
-        sfx.play(sfx.shutter)
+        try:
+            sfx.play(sfx.shutter)
+        except Exception as e:
+            print(f"Error playing sound: {e}")
+            
         dialog = CameraCaptureDialog(self)
         if dialog.exec_() == QDialog.Accepted and dialog.captured_path:
             image_path = dialog.captured_path
@@ -240,7 +245,7 @@ class MainWindow(QWidget):
                 f"<img src='{file_url}' style='width:100%; height:auto; border-radius:12px; box-shadow:0 0 8px #ccc;'>"
                 f"</div>"
             )
-            self.append_message("你", f"拍摄了一张图片<br>{img_html}", "right", is_html=True)
+            self.append_message("你", f"{img_html}", "right", is_html=True)
 
             from modules.utils.vision import describe_image
             result_html = describe_image(image_path).replace("\n", "<br>")
@@ -312,14 +317,22 @@ class MainWindow(QWidget):
         return super().eventFilter(source, event)
 
     def start_voice_recording(self):
-        sfx.play(sfx.voice_start)
+        try:
+            sfx.play(sfx.voice_start)
+        except Exception as e:
+            print(f"Error playing sound: {e}")
+            
         self.append_message("系统", "🎙️ 按住录音中，请开始说话...", "left")
         self.voice_recorder = VoiceRecorder()
         self.recording_thread = threading.Thread(target=self.voice_recorder.start_recording)
         self.recording_thread.start()
 
     def stop_voice_recording(self):
-        sfx.play(sfx.voice_end)
+        try:
+            sfx.play(sfx.voice_end)
+        except Exception as e:
+            print(f"Error playing sound: {e}")
+            
         self.voice_recorder.stop_recording()
         self.recording_thread.join()
 

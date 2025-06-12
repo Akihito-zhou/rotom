@@ -133,8 +133,11 @@ def format_pokemon_html(data: dict, fields: Optional[List[str]] = None) -> str:
         shape = form.get("shape", "-")
         color = form.get("color", "-")
         gender_rate = form.get("gender_rate", {})
-        male = gender_rate.get("male", "？")
-        female = gender_rate.get("female", "？")
+        if isinstance(gender_rate, dict):
+            male = gender_rate.get("male", "？")
+            female = gender_rate.get("female", "？")
+        else:
+            male = female = "？"
         catch_rate = form.get("catch_rate", {}).get("rate", "？")
         ability_html = ", ".join(
             f"{a['name']}<span style='color:gray;'>（隐藏）</span>" if a.get("is_hidden") else a["name"]
@@ -197,20 +200,35 @@ def format_pokemon_html(data: dict, fields: Optional[List[str]] = None) -> str:
         chains = data.get("evolution_chains", [])
         evo_html = ""
         for chain in chains:
-            evo_html += "<div style='margin: 0.5em 0;'>"
-            for stage in chain:
+            evo_html += "<div style='margin: 1em 0;'>"
+            for i, stage in enumerate(chain):
                 name = stage["name"]
                 img_file = stage.get("image", "")
+                evo_block = ""
+
                 if img_file:
                     evo_path = os.path.abspath(os.path.join(IMAGE_DIR_EVOLUTION, img_file))
                     if os.path.exists(evo_path):
                         evo_url = f"file:///{quote(evo_path.replace(os.sep, '/'))}"
-                        evo_html += f"<img src='{evo_url}' style='height:48px'> → <b>{name}</b> "
+                        evo_block += f"""
+                        <div style='text-align:center; margin-bottom:0.5em;'>
+                            <img src='{evo_url}' style='max-height:96px; border-radius:10px;'><br>
+                            <b>{name}</b>
+                        </div>
+                        """
                     else:
-                        evo_html += f"<b>{name}</b> → "
+                        evo_block += f"<div style='text-align:center;'><b>{name}</b></div>"
                 else:
-                    evo_html += f"<b>{name}</b> → "
+                    evo_block += f"<div style='text-align:center;'><b>{name}</b></div>"
+
+                evo_html += evo_block
+
+                # 如果不是最后一个阶段，添加向下箭头
+                if i < len(chain) - 1:
+                    evo_html += "<div style='text-align:center; font-size:20px;'>↓</div>"
+
             evo_html += "</div>"
+
         output.append(f"<br>🌱 <b>进化链：</b><br>{evo_html}")
 
     # 🎯 招式
